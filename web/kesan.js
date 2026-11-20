@@ -243,7 +243,7 @@ const Kesan = (() => {
     // Çapraz tablo: satır = ev sahibi, sütun = deplasman
     const takimlar = data.standings.map(r => ({id:r.id, ad:title(r.ad)}));
     const skor = {}; tum.forEach(m => { skor[m.evId+'|'+m.depId] = m.evG != null ? m.evG+'-'+m.depG : ''; });
-    const kisa = s => s.replace(/ (Spor|SK|Futbol SK|Belediye Spor|Spor Kulübü)$/,'').slice(0,12);
+    const kisa = s => s.replace(/ (Spor|SK|Futbol SK|Belediye Spor|Spor Kulübü)$/,'').slice(0,16);
 
     return `<div class="lig-title">Profesyonelliğe Geçiş Ligi ${esc(title(data.grupAd||''))} – 2026/27</div>
       <div class="weeks"><div><b>1. Devre</b>${range(1,yari).map(btn).join('')}</div>
