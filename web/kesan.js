@@ -288,7 +288,8 @@ const Kesan = (() => {
     try{ history.pushState({reader:true}, ''); }catch{}
     if(window.BULUT || window.STATIK){
       body.innerHTML = `<h1>${esc(n.baslik)}</h1><div class="rmeta">${esc(n.kaynak)} · ${n.tarih?fmtDate(n.tarih,false):''}</div>
-        <div class="rtext"><p>${esc(n.ozet)}</p></div>
+        ${n.resim && window.STATIK ? `<img class="rimg" src="${esc(n.resim.replace(/&w=240&h=180&c=14$/,''))}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
+        <div class="rtext">${n.ozet ? `<p>${esc(n.ozet)}</p>` : '<p class="small" style="text-align:left">Bu haber için kaynak sitesi özet yayınlamamış.</p>'}</div>
         <div class="small">Kaynak: ${esc(n.kaynak)}</div>`;
       return;
     }
