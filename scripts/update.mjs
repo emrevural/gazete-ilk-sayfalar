@@ -149,12 +149,24 @@ try {
   console.log(`Haber: ${n.items.length} (yeni detay: ${dolan}, detaylı toplam: ${n.items.filter(x => x.ozet).length})`);
 } catch (e) { hatalar.push("Haberler: " + e.message); }
 
+// Teşhis: birkaç büyük görselin durumu ve boyutu
+async function gorselBilgi(u) {
+  try {
+    const r = await fetch(u, { method: "HEAD", headers: { "User-Agent": UA }, signal: AbortSignal.timeout(20000), redirect: "manual" });
+    return { u, durum: r.status, tur: r.headers.get("content-type"), boyut: +r.headers.get("content-length") || null, yon: r.headers.get("location") };
+  } catch (e) { return { u, hata: e.message }; }
+}
+const teshis = [];
+for (const k of ["edirne", "yaygin"]) for (const g of (yeni.gazete[k] || []).slice(0, 3)) {
+  teshis.push({ k, ad: g.name, full: await gorselBilgi(g.full), thumb: await gorselBilgi(g.thumb) });
+}
+
 // Siteye küçük bir durum özeti (sorun ayıklamak için)
 yeni.durum = {
   t: Date.now(),
   edirne: yeni.gazete.edirne?.length || 0, ulusal: yeni.gazete.yaygin?.length || 0,
   mac: yeni.tff?.matches?.length || 0, haber: yeni.news?.items?.length || 0,
-  detayli: yeni.news?.items?.filter(x => x.ozet).length || 0, hatalar,
+  detayli: yeni.news?.items?.filter(x => x.ozet).length || 0, hatalar, teshis,
 };
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
