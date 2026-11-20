@@ -113,11 +113,14 @@ const Kesan = (() => {
     const lists = await pool(Array.from({length:maxW}, (_,i)=>i+1), 4,
                     async w => parseMatches(parse(await getHtml(groupUrl(grup, w))), w));
     const seen = new Set();
-    const matches = lists.flat()
-      .filter(m => m.evId === KESAN_AYAR.kulupID || m.depId === KESAN_AYAR.kulupID)
+    const tum = lists.flat()
       .filter(m => { const k = m.hafta+'|'+m.evId+'|'+m.depId; return !seen.has(k) && seen.add(k); })
+      .sort((a,b) => a.hafta - b.hafta || a.tarih - b.tarih)
+      .map(({macId, ...m}) => m);
+    const matches = tum.filter(m => m.evId === KESAN_AYAR.kulupID || m.depId === KESAN_AYAR.kulupID)
       .sort((a,b) => a.tarih - b.tarih || a.hafta - b.hafta);
-    return { grup, grupAd, standings, matches, t: Date.now() };
+    const gm = doc.body.textContent.match(/\((\d+)\.\s*hafta\)/i);
+    return { grup, grupAd, standings, matches, tum, haftaSayisi: maxW, guncelHafta: gm ? +gm[1] : null, t: Date.now() };
   }
 
   /* ---------- Haberler (Bing RSS) ---------- */
@@ -181,8 +184,9 @@ const Kesan = (() => {
     </div>
     <div class="seg">
       <button data-v="haber" class="${view==='haber'?'on':''}">Haberler</button>
-      <button data-v="fikstur" class="${view==='fikstur'?'on':''}">Fikstür</button>
-      <button data-v="puan" class="${view==='puan'?'on':''}">Puan Durumu</button>
+      <button data-v="fikstur" class="${view==='fikstur'?'on':''}">Maçlar</button>
+      <button data-v="puan" class="${view==='puan'?'on':''}">Puan</button>
+      <button data-v="lig" class="${view==='lig'?'on':''}">Lig</button>
     </div>`;
   }
 
@@ -209,6 +213,68 @@ const Kesan = (() => {
       </tbody></table><div class="small">Kaynak: TFF · ${fmtDate(data.t)} güncellendi</div>`;
   }
 
+  /* ---------- Lig: hafta seçici + maç programı + form'lu puan durumu + çapraz tablo ---------- */
+  let ligHafta = null;
+  function formOf(tum, id){
+    return tum.filter(m => m.evG != null && (m.evId === id || m.depId === id))
+      .sort((a,b) => a.tarih - b.tarih).slice(-5).map(m => {
+        const [a,b] = m.evId === id ? [m.evG, m.depG] : [m.depG, m.evG];
+        return a > b ? 'W' : a < b ? 'L' : 'D';
+      });
+  }
+  function bodyLig(){
+    if(!data) return '';
+    const tum = data.tum || [];
+    if(!tum.length) return '<div class="status">Lig programı bir sonraki güncellemede eklenecek.</div>';
+    const n = data.haftaSayisi || Math.max(...tum.map(m=>m.hafta));
+    if(ligHafta == null){
+      const oynanmamis = tum.filter(m => m.evG == null).map(m => m.hafta);
+      ligHafta = data.guncelHafta || (oynanmamis.length ? Math.min(...oynanmamis) : n);
+    }
+    const yari = Math.ceil(n/2);
+    const btn = w => `<button class="wk ${w===ligHafta?'on':''}" data-w="${w}">${w}</button>`;
+    const range = (a,b) => Array.from({length:b-a+1}, (_,i)=>a+i);
+    const me = KESAN_AYAR.kulupID;
+    const haftaMac = tum.filter(m => m.hafta === ligHafta);
+    const tarih = t => new Date(t).toLocaleDateString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const saat = (m) => m.saatVar ? new Date(m.tarih).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) : '';
+    const ad = (nm,id) => `<span class="${id===me?'me':''}">${esc(title(nm))}</span>`;
+
+    // Çapraz tablo: satır = ev sahibi, sütun = deplasman
+    const takimlar = data.standings.map(r => ({id:r.id, ad:title(r.ad)}));
+    const skor = {}; tum.forEach(m => { skor[m.evId+'|'+m.depId] = m.evG != null ? m.evG+'-'+m.depG : ''; });
+    const kisa = s => s.replace(/ (Spor|SK|Futbol SK|Belediye Spor|Spor Kulübü)$/,'').slice(0,12);
+
+    return `<div class="lig-title">Profesyonelliğe Geçiş Ligi ${esc(title(data.grupAd||''))} – 2026/27</div>
+      <div class="weeks"><div><b>1. Devre</b>${range(1,yari).map(btn).join('')}</div>
+        <div><b>2. Devre</b>${range(yari+1,n).map(btn).join('')}</div></div>
+      <div class="scroll"><table class="fx">
+        <thead><tr><th>Tarih</th><th>Saat</th><th class="r">Evsahibi</th><th>Sonuç</th><th class="l">Misafir</th></tr></thead>
+        <tbody>${haftaMac.length ? haftaMac.map(m => `<tr class="${m.evId===me||m.depId===me?'mine':''}">
+          <td>${m.tarih?tarih(m.tarih):''}</td><td>${saat(m)}</td><td class="r">${ad(m.ev,m.evId)}</td>
+          <td class="sc">${m.evG!=null?m.evG+' - '+m.depG:'-'}</td><td class="l">${ad(m.dep,m.depId)}</td></tr>`).join('')
+          : '<tr><td colspan="5">Bu hafta için maç bilgisi yok.</td></tr>'}</tbody></table></div>
+      ${(() => { const bay = takimlar.filter(t => !haftaMac.some(m => m.evId===t.id || m.depId===t.id));
+                 return haftaMac.length && bay.length ? `<div class="small" style="text-align:left">Bay: ${bay.map(t=>esc(t.ad)).join(', ')}</div>` : ''; })()}
+
+      <div class="sec-title">Puan durumu</div>
+      <div class="scroll"><table class="st">
+        <thead><tr><th>#</th><th style="text-align:left">Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>A</th><th>Y</th><th>Av.</th><th>P</th><th>Form</th></tr></thead>
+        <tbody>${data.standings.map(r => `<tr class="${r.id===me?'me':''}"><td>${r.sira}.</td><td class="tm">${esc(title(r.ad))}</td>
+          <td>${r.O}</td><td>${r.G}</td><td>${r.B}</td><td>${r.M}</td><td>${r.A}</td><td>${r.Y}</td><td>${r.AV}</td><td class="p">${r.P}</td>
+          <td><span class="form">${formOf(tum, r.id).map(f=>`<i class="${f}" title="${{W:'Galibiyet',D:'Beraberlik',L:'Mağlubiyet'}[f]}">${harf[f]}</i>`).join('')}</span></td></tr>`).join('')}
+        </tbody></table></div>
+
+      <div class="sec-title">Çapraz tablo <span style="text-transform:none;font-weight:400">(satır: ev sahibi, sütun: misafir)</span></div>
+      <div class="scroll"><table class="cx">
+        <thead><tr><th></th>${takimlar.map((t,i)=>`<th title="${esc(t.ad)}">${i+1}</th>`).join('')}</tr></thead>
+        <tbody>${takimlar.map((a,i) => `<tr class="${a.id===me?'me':''}"><th class="tm">${i+1}. ${esc(kisa(a.ad))}</th>${takimlar.map(b =>
+          a.id===b.id ? '<td class="x"></td>' : `<td class="${(a.id===me||b.id===me)&&skor[a.id+'|'+b.id]?'mine':''}">${skor[a.id+'|'+b.id]||''}</td>`).join('')}</tr>`).join('')}
+        </tbody></table></div>
+      <div class="small">O: oynanan · G: galibiyet · B: beraberlik · M: mağlubiyet · A: attığı · Y: yediği · Av.: averaj · P: puan<br>
+        Kaynak: TFF · ${fmtDate(data.t)} güncellendi</div>`;
+  }
+
   function bodyHaber(){
     if(!news) return '<div class="status"><div class="spinner"></div>Haberler yükleniyor…</div>';
     if(!news.items.length) return '<div class="status">Keşanspor ile ilgili haber bulunamadı.</div>';
@@ -226,12 +292,13 @@ const Kesan = (() => {
     } else if(view !== 'haber' && !data){
       body = '<div class="status"><div class="spinner"></div>TFF verileri çekiliyor…<br><small>(ilk açılışta birkaç saniye sürebilir)</small></div>';
     } else {
-      body = view==='haber' ? bodyHaber() : view==='puan' ? bodyPuan() : bodyFikstur();
+      body = view==='haber' ? bodyHaber() : view==='puan' ? bodyPuan() : view==='lig' ? bodyLig() : bodyFikstur();
     }
     const c = el('#content');
     c.innerHTML = header() + body;
     c.querySelectorAll('.seg button').forEach(b => b.onclick = () => { view = b.dataset.v; paint(); ensure(); });
     c.querySelectorAll('.news').forEach(d => d.onclick = () => openReader(news.items[+d.dataset.i]));
+    c.querySelectorAll('.wk').forEach(b => b.onclick = () => { ligHafta = +b.dataset.w; paint(); });
     const r = c.querySelector('#ks-retry'); if(r) r.onclick = () => ensure(true);
   }
 
