@@ -1,0 +1,10 @@
+{
+  "appId": "tr.emre.gazete",
+  "appName": "Gazete İlk Sayfalar",
+  "webDir": "www",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}
