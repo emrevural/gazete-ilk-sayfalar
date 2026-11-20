@@ -149,51 +149,12 @@ try {
   console.log(`Haber: ${n.items.length} (yeni detay: ${dolan}, detaylı toplam: ${n.items.filter(x => x.ozet).length})`);
 } catch (e) { hatalar.push("Haberler: " + e.message); }
 
-// Teşhis: birkaç büyük görselin durumu ve boyutu
-async function gorselBilgi(u) {
-  try {
-    const t0 = Date.now();
-    const r = await fetch(u, { headers: { "User-Agent": UA, "Referer": "https://gazete.bik.gov.tr/" }, signal: AbortSignal.timeout(40000) });
-    const b = Buffer.from(await r.arrayBuffer());
-    let en = null, boy = null;
-    if (b[0] === 0xFF && b[1] === 0xD8) { // JPEG boyutu (SOF)
-      for (let i = 2; i < b.length - 9;) { if (b[i] !== 0xFF) { i++; continue; } const m = b[i+1];
-        if (m >= 0xC0 && m <= 0xC3) { boy = b.readUInt16BE(i+5); en = b.readUInt16BE(i+7); break; }
-        i += 2 + b.readUInt16BE(i+2); }
-    }
-    return { durum: r.status, tur: r.headers.get("content-type"), kb: Math.round(b.length/1024), en, boy, sn: (Date.now()-t0)/1000,
-             bas: b[0] === 0xFF ? "jpeg" : b.subarray(0, 60).toString("latin1") };
-  } catch (e) { return { u, hata: e.message }; }
-}
-const teshis = [];
-let cerez = "";
-async function gorselCerezle(u, sayfa) {
-  try {
-    if (!cerez) {
-      const r0 = await fetch(sayfa, { headers: { "User-Agent": UA } });
-      cerez = (r0.headers.getSetCookie?.() || []).map(c => c.split(";")[0]).join("; ");
-    }
-    const r = await fetch(u, { headers: { "User-Agent": UA, "Referer": sayfa, "Cookie": cerez, "Accept": "image/avif,image/webp,image/*,*/*;q=0.8" }, signal: AbortSignal.timeout(40000) });
-    const b = Buffer.from(await r.arrayBuffer());
-    return { durum: r.status, tur: r.headers.get("content-type"), kb: Math.round(b.length / 1024), cerezVar: !!cerez };
-  } catch (e) { return { hata: e.message }; }
-}
-for (const [k, sayfa] of Object.entries(KAYNAK)) {
-  const html = await getHtml(sayfa).catch(e => "HATA " + e.message);
-  // ilk gazete kartının ham HTML'i ve sayfadaki tüm farklı bağlantı kalıpları
-  const i = html.search(/first_pages/);
-  const kalip = [...new Set([...html.matchAll(/(?:href|src|data-[\w-]+)="([^"]*(?:first_pages|IlkSayfa|Gazete)[^"]*)"/gi)].map(m => m[1].replace(/\d+/g, "#")))].slice(0, 15);
-  const g = (yeni.gazete[k] || [])[0];
-  teshis.push({ k, parca: i >= 0 ? html.slice(Math.max(0, i - 700), i + 700) : html.slice(0, 500), kalip,
-                fullCerez: g ? await gorselCerezle(g.full, sayfa) : null, thumbCerez: g ? await gorselCerezle(g.thumb, sayfa) : null });
-}
-
 // Siteye küçük bir durum özeti (sorun ayıklamak için)
 yeni.durum = {
   t: Date.now(),
   edirne: yeni.gazete.edirne?.length || 0, ulusal: yeni.gazete.yaygin?.length || 0,
   mac: yeni.tff?.matches?.length || 0, haber: yeni.news?.items?.length || 0,
-  detayli: yeni.news?.items?.filter(x => x.ozet).length || 0, hatalar, teshis,
+  detayli: yeni.news?.items?.filter(x => x.ozet).length || 0, hatalar,
 };
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
