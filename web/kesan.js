@@ -252,20 +252,18 @@ const Kesan = (() => {
     return `<div class="lig-title">Profesyonelliğe Geçiş Ligi ${esc(title(data.grupAd||''))} – 2026/27</div>
       <div class="weeks"><div><b>1. Devre</b>${range(1,yari).map(btn).join('')}</div>
         <div><b>2. Devre</b>${range(yari+1,n).map(btn).join('')}</div></div>
-      <div class="scroll"><table class="fx">
-        <thead><tr><th>Tarih</th><th>Saat</th><th class="r">Evsahibi</th><th>Sonuç</th><th class="l">Misafir</th></tr></thead>
-        <tbody>${haftaMac.length ? haftaMac.map(m => `<tr class="${m.evId===me||m.depId===me?'mine':''}">
-          <td>${m.tarih?tarih(m.tarih):''}</td><td>${saat(m)}</td><td class="r">${ad(m.ev,m.evId)}</td>
-          <td class="sc">${m.evG!=null?m.evG+' - '+m.depG:'-'}</td><td class="l">${ad(m.dep,m.depId)}</td></tr>`).join('')
-          : '<tr><td colspan="5">Bu hafta için maç bilgisi yok.</td></tr>'}</tbody></table></div>
+      <div class="fxlist">${haftaMac.length ? haftaMac.map(m => `<div class="fxrow ${m.evId===me||m.depId===me?'mine':''}">
+          <div class="fxmeta">${m.tarih?tarih(m.tarih):''}${saat(m)?' · '+saat(m):''}</div>
+          <div class="fxteams"><div class="r">${ad(m.ev,m.evId)}</div><div class="sc">${m.evG!=null?m.evG+' - '+m.depG:'-'}</div><div>${ad(m.dep,m.depId)}</div></div>
+        </div>`).join('') : '<div class="status">Bu hafta için maç bilgisi yok.</div>'}</div>
       ${(() => { const bay = takimlar.filter(t => !haftaMac.some(m => m.evId===t.id || m.depId===t.id));
                  return haftaMac.length && bay.length ? `<div class="small" style="text-align:left">Bay: ${bay.map(t=>esc(t.ad)).join(', ')}</div>` : ''; })()}
 
       <div class="sec-title">Puan durumu</div>
       <div class="scroll"><table class="st">
-        <thead><tr><th>#</th><th style="text-align:left">Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>A</th><th>Y</th><th>Av.</th><th>P</th><th>Form</th></tr></thead>
+        <thead><tr><th>#</th><th style="text-align:left">Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th class="gz">A</th><th class="gz">Y</th><th>Av.</th><th>P</th><th>Form</th></tr></thead>
         <tbody>${data.standings.map(r => `<tr class="${r.id===me?'me':''}"><td>${r.sira}.</td><td class="tm">${esc(title(r.ad))}</td>
-          <td>${r.O}</td><td>${r.G}</td><td>${r.B}</td><td>${r.M}</td><td>${r.A}</td><td>${r.Y}</td><td>${r.AV}</td><td class="p">${r.P}</td>
+          <td>${r.O}</td><td>${r.G}</td><td>${r.B}</td><td>${r.M}</td><td class="gz">${r.A}</td><td class="gz">${r.Y}</td><td>${r.AV}</td><td class="p">${r.P}</td>
           <td><span class="form">${formOf(tum, r.id).map(f=>`<i class="${f}" title="${{W:'Galibiyet',D:'Beraberlik',L:'Mağlubiyet'}[f]}">${harf[f]}</i>`).join('')}</span></td></tr>`).join('')}
         </tbody></table></div>
 

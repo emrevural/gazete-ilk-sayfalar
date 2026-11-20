@@ -37,6 +37,8 @@ jobs:
             git commit -m "veri: $(TZ=Europe/Istanbul date +'%Y-%m-%d %H:%M')"
             git pull --rebase && git push
           fi
+      - name: Önbellek için sürüm numarası
+        run: sed -i "s/__SURUM__/${GITHUB_SHA::7}/g" web/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: web }
