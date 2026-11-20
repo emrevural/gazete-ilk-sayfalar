@@ -19,7 +19,13 @@ async function getHtml(url, tries = 3) {
     try {
       const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "tr-TR,tr;q=0.9" }, signal: AbortSignal.timeout(30000) });
       if (!r.ok) throw new Error("HTTP " + r.status);
-      return await r.text();
+      // TFF windows-1254 (Türkçe) kullanıyor; karakter setini başlıktan ya da <meta>'dan bul
+      const buf = Buffer.from(await r.arrayBuffer());
+      let cs = (r.headers.get("content-type") || "").match(/charset=([\w-]+)/i)?.[1];
+      if (!cs) cs = buf.subarray(0, 4096).toString("latin1").match(/<meta[^>]+charset=["']?([\w-]+)/i)?.[1];
+      cs = (cs || "utf-8").toLowerCase();
+      if (/^(iso-8859-9|latin5|windows-1254|cp1254)$/.test(cs)) cs = "windows-1254";
+      try { return new TextDecoder(cs).decode(buf); } catch { return new TextDecoder("utf-8").decode(buf); }
     } catch (e) {
       if (i >= tries) throw new Error(`${url} → ${e.message}`);
       await new Promise(s => setTimeout(s, 2000 * i));
@@ -65,10 +71,26 @@ try {
   console.log(`TFF: ${d.grupAd}, ${d.standings.length} takım, ${d.matches.length} Keşan maçı`);
 } catch (e) { hatalar.push("TFF: " + e.message); }
 
-// 3) Keşanspor — haberler
+// 3) Keşanspor — haberler (Bing; boş gelirse Google Haberler)
+async function googleNews() {
+  const url = "https://news.google.com/rss/search?q=" + encodeURIComponent("Keşanspor") + "&hl=tr&gl=TR&ceid=TR:tr";
+  const xml = new w.DOMParser().parseFromString(await getHtml(url), "text/xml");
+  const tag = (it, n) => it.getElementsByTagName(n)[0]?.textContent.trim() || "";
+  const items = [...xml.getElementsByTagName("item")].map(it => {
+    const kaynak = tag(it, "source");
+    let baslik = tag(it, "title");
+    if (kaynak && baslik.endsWith(" - " + kaynak)) baslik = baslik.slice(0, -(kaynak.length + 3));
+    return { baslik, url: tag(it, "link"), kaynak, tarih: Date.parse(tag(it, "pubDate")) || 0, ozet: "", resim: "" };
+  }).filter(n => /keşan/i.test(n.baslik)).sort((a, b) => b.tarih - a.tarih).slice(0, 20);
+  return { items, t: Date.now() };
+}
 try {
-  yeni.news = plain(await K.loadNews());
-  console.log(`Haber: ${yeni.news.items.length}`);
+  let n = null;
+  try { n = plain(await K.loadNews()); } catch (e) { console.log("Bing: " + e.message); }
+  if (!n || !n.items.length) { console.log("Bing boş döndü, Google Haberler deneniyor"); n = await googleNews(); }
+  if (!n.items.length) throw new Error("hiç haber bulunamadı");
+  yeni.news = n;
+  console.log(`Haber: ${n.items.length}`);
 } catch (e) { hatalar.push("Haberler: " + e.message); }
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });

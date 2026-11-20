@@ -29,6 +29,11 @@ function parseNewspapers(html, base){
     let name = (img.getAttribute('alt')||img.getAttribute('title')||(a&&a.getAttribute('title'))||'').trim();
     if(!name || /^(resim|image|gazete|img)$/i.test(name)) name = txt.slice(0,60);
     if(!name) name = decodeURIComponent(full.split('/').pop().split('?')[0]).replace(IMG_EXT,'');
+    // BİK: "20 Kasım 2026 - Cuma tarihli BATI EKSPRES gazetesi ilk sayfası" → "Batı Ekspres"
+    name = name.replace(/^.*?tarihli\s+/i, '').replace(/\s+gazetesi\s+ilk\s+sayfas[ıi]\s*$/i, '').trim();
+    if(name === name.toLocaleUpperCase('tr-TR')){
+      name = name.toLocaleLowerCase('tr-TR').replace(/(^|[\s.(/-])(\p{L})/gu, (m,a,b)=>a+b.toLocaleUpperCase('tr-TR'));
+    }
     out.push({ name, thumb, full });
   });
   return out;
