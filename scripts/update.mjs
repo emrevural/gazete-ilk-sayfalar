@@ -152,8 +152,17 @@ try {
 // Teşhis: birkaç büyük görselin durumu ve boyutu
 async function gorselBilgi(u) {
   try {
-    const r = await fetch(u, { method: "HEAD", headers: { "User-Agent": UA }, signal: AbortSignal.timeout(20000), redirect: "manual" });
-    return { u, durum: r.status, tur: r.headers.get("content-type"), boyut: +r.headers.get("content-length") || null, yon: r.headers.get("location") };
+    const t0 = Date.now();
+    const r = await fetch(u, { headers: { "User-Agent": UA, "Referer": "https://gazete.bik.gov.tr/" }, signal: AbortSignal.timeout(40000) });
+    const b = Buffer.from(await r.arrayBuffer());
+    let en = null, boy = null;
+    if (b[0] === 0xFF && b[1] === 0xD8) { // JPEG boyutu (SOF)
+      for (let i = 2; i < b.length - 9;) { if (b[i] !== 0xFF) { i++; continue; } const m = b[i+1];
+        if (m >= 0xC0 && m <= 0xC3) { boy = b.readUInt16BE(i+5); en = b.readUInt16BE(i+7); break; }
+        i += 2 + b.readUInt16BE(i+2); }
+    }
+    return { durum: r.status, tur: r.headers.get("content-type"), kb: Math.round(b.length/1024), en, boy, sn: (Date.now()-t0)/1000,
+             bas: b[0] === 0xFF ? "jpeg" : b.subarray(0, 60).toString("latin1") };
   } catch (e) { return { u, hata: e.message }; }
 }
 const teshis = [];
