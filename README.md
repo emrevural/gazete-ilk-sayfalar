@@ -12,5 +12,5 @@ Gazete görselleri depoya indirilmez; yalnızca BİK'teki adresleri kaydedilir v
 görseli doğrudan BİK'ten yükler.
 
 ## Kurulum (bir kez)
-Site `gh-pages` dalından yayınlanır. Pages kendiliğinden açılmazsa: Settings → Pages → Source: **Deploy from a branch** → `gh-pages` / `(root)`. Sonra Actions → "Verileri güncelle
+Settings → Pages → Source: **GitHub Actions**. Sonra Actions → "Verileri güncelle
 ve yayınla" → Run workflow.
