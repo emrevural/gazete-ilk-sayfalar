@@ -166,8 +166,26 @@ async function gorselBilgi(u) {
   } catch (e) { return { u, hata: e.message }; }
 }
 const teshis = [];
-for (const k of ["edirne", "yaygin"]) for (const g of (yeni.gazete[k] || []).slice(0, 3)) {
-  teshis.push({ k, ad: g.name, full: await gorselBilgi(g.full), thumb: await gorselBilgi(g.thumb) });
+let cerez = "";
+async function gorselCerezle(u, sayfa) {
+  try {
+    if (!cerez) {
+      const r0 = await fetch(sayfa, { headers: { "User-Agent": UA } });
+      cerez = (r0.headers.getSetCookie?.() || []).map(c => c.split(";")[0]).join("; ");
+    }
+    const r = await fetch(u, { headers: { "User-Agent": UA, "Referer": sayfa, "Cookie": cerez, "Accept": "image/avif,image/webp,image/*,*/*;q=0.8" }, signal: AbortSignal.timeout(40000) });
+    const b = Buffer.from(await r.arrayBuffer());
+    return { durum: r.status, tur: r.headers.get("content-type"), kb: Math.round(b.length / 1024), cerezVar: !!cerez };
+  } catch (e) { return { hata: e.message }; }
+}
+for (const [k, sayfa] of Object.entries(KAYNAK)) {
+  const html = await getHtml(sayfa).catch(e => "HATA " + e.message);
+  // ilk gazete kartının ham HTML'i ve sayfadaki tüm farklı bağlantı kalıpları
+  const i = html.search(/first_pages/);
+  const kalip = [...new Set([...html.matchAll(/(?:href|src|data-[\w-]+)="([^"]*(?:first_pages|IlkSayfa|Gazete)[^"]*)"/gi)].map(m => m[1].replace(/\d+/g, "#")))].slice(0, 15);
+  const g = (yeni.gazete[k] || [])[0];
+  teshis.push({ k, parca: i >= 0 ? html.slice(Math.max(0, i - 700), i + 700) : html.slice(0, 500), kalip,
+                fullCerez: g ? await gorselCerezle(g.full, sayfa) : null, thumbCerez: g ? await gorselCerezle(g.thumb, sayfa) : null });
 }
 
 // Siteye küçük bir durum özeti (sorun ayıklamak için)
