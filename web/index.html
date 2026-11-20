@@ -392,17 +392,30 @@ stage.addEventListener('wheel', e => {
 
 // Sürükleme + iki parmakla yakınlaştırma + çift dokunma
 const ptrs = new Map(); let last = null, pinch = null, lastTap = 0;
+// Kaydırarak gazete değiştirme: yalnızca gazete tam ekran (büyütülmemiş) haldeyken
+let sw = null;
+const tamBoy = () => Z.s <= Z.fit * 1.02;
+function gec(yon){
+  const i = state.index + yon;
+  if(i < 0 || i >= state.list.length) return false;
+  vimg.style.transition = 'transform .18s ease-out';
+  vimg.style.transform = `translate(${Z.x - yon * stage.clientWidth}px,${Z.y}px) scale(${Z.s})`;
+  setTimeout(() => { vimg.style.transition = ''; openViewerNoPush(i); }, 180);
+  return true;
+}
 stage.addEventListener('pointerdown', e => {
   if(e.target.closest('button')) return;
   stage.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
   stage.classList.add('drag');
   if(ptrs.size === 1){
+    sw = { x0:e.clientX, y0:e.clientY, dx:0, dy:0, aktif: tamBoy(), iptal:false };
     last = {x:e.clientX, y:e.clientY};
     const now = Date.now();
     if(now - lastTap < 300){ const r = stage.getBoundingClientRect();
       Z.s > Z.fit*1.05 ? fit() : zoomAt(2.5, e.clientX-r.left, e.clientY-r.top); }
     lastTap = now;
   } else if(ptrs.size === 2){
+    if(sw) sw.iptal = true;
     const [a,b] = [...ptrs.values()];
     pinch = { d: Math.hypot(a.x-b.x, a.y-b.y), s: Z.s };
   }
@@ -415,12 +428,28 @@ stage.addEventListener('pointermove', e => {
     const [a,b] = [...ptrs.values()];
     const d = Math.hypot(a.x-b.x, a.y-b.y);
     zoomAt((pinch.s * d/pinch.d) / Z.s, (a.x+b.x)/2 - r.left, (a.y+b.y)/2 - r.top);
+  } else if(ptrs.size === 1 && sw && sw.aktif && !sw.iptal){
+    // Tam boydayken: görsel parmağı yatayda takip eder
+    sw.dx = e.clientX - sw.x0; sw.dy = e.clientY - sw.y0;
+    if(Math.abs(sw.dx) > Math.abs(sw.dy)){
+      const uc = (sw.dx > 0 && state.index === 0) || (sw.dx < 0 && state.index === state.list.length-1);
+      vimg.style.transform = `translate(${Z.x + (uc ? sw.dx/4 : sw.dx)}px,${Z.y}px) scale(${Z.s})`;
+    }
   } else if(ptrs.size === 1 && last){
     Z.x += e.clientX - last.x; Z.y += e.clientY - last.y;
     last = {x:e.clientX, y:e.clientY}; clampPan(); apply();
   }
 });
-function up(e){ ptrs.delete(e.pointerId); if(ptrs.size<2) pinch=null;
+function up(e){
+  if(ptrs.size === 1 && sw && sw.aktif && !sw.iptal){
+    const yatay = Math.abs(sw.dx) > 60 && Math.abs(sw.dx) > Math.abs(sw.dy) * 1.3;
+    if(!(yatay && gec(sw.dx < 0 ? 1 : -1))){
+      vimg.style.transition = 'transform .15s ease-out'; apply();
+      setTimeout(() => vimg.style.transition = '', 160);
+    }
+    sw = null;
+  }
+  ptrs.delete(e.pointerId); if(ptrs.size<2) pinch=null;
   if(ptrs.size===1){ const p=[...ptrs.values()][0]; last={x:p.x,y:p.y}; }
   if(!ptrs.size){ last=null; stage.classList.remove('drag'); } }
 stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
