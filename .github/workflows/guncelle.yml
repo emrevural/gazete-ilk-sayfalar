@@ -1,5 +1,4 @@
 name: Verileri güncelle ve yayınla
-# Not: deploy-pages adımı geçici "artifact bulunamadı" hatası verirse iş akışını yeniden çalıştırmak yeter.
 on:
   schedule:
     # TR saatiyle 07:30, 10:30, 16:30, 22:30 (gazeteler sabah, maç sonuçları akşam)
@@ -20,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.yayin.outputs.page_url }}
+      url: ${{ steps.yayin.outputs.page_url || steps.yayin2.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,7 +40,14 @@ jobs:
       - name: Önbellek için sürüm numarası
         run: sed -i "s/__SURUM__/${GITHUB_SHA::7}/g" web/index.html
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with: { path: web }
       - id: yayin
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: Yayın başarısızsa bekle
+        if: steps.yayin.outcome == 'failure'
+        run: sleep 30
+      - id: yayin2
+        if: steps.yayin.outcome == 'failure'
         uses: actions/deploy-pages@v4
