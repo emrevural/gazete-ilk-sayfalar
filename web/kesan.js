@@ -11,7 +11,11 @@ const KESAN_AYAR = {
 };
 
 const Kesan = (() => {
-  let view = 'fikstur';           // 'haber' | 'fikstur' | 'puan'
+  // Alt sekme adres çubuğundan okunur/yazılır: #kesanspor-haberler, -maclar, -puan, -lig
+  const ALT = { haber:'haberler', fikstur:'maclar', puan:'puan', lig:'lig' };
+  const altHash = () => { const p = decodeURIComponent(location.hash.slice(1)).toLowerCase().split('-');
+                          return p[0] === 'kesanspor' ? Object.keys(ALT).find(k => ALT[k] === p[1]) : null; };
+  let view = altHash() || 'fikstur';
   let data = null;                // { grup, grupAd, standings, matches, t }
   let news = null;
   let busy = false;
@@ -296,7 +300,11 @@ const Kesan = (() => {
     }
     const c = el('#content');
     c.innerHTML = header() + body;
-    c.querySelectorAll('.seg button').forEach(b => b.onclick = () => { view = b.dataset.v; paint(); ensure(); });
+    c.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
+      view = b.dataset.v;
+      try{ history.replaceState(history.state, '', '#kesanspor-' + ALT[view]); }catch{}
+      paint(); ensure();
+    });
     c.querySelectorAll('.news').forEach(d => d.onclick = () => openReader(news.items[+d.dataset.i]));
     c.querySelectorAll('.wk').forEach(b => b.onclick = () => { ligHafta = +b.dataset.w; paint(); });
     const r = c.querySelector('#ks-retry'); if(r) r.onclick = () => ensure(true);
@@ -379,5 +387,5 @@ const Kesan = (() => {
   el('#rclose').onclick = () => history.back();
   window.addEventListener('popstate', () => { if(el('#reader').classList.contains('open')) el('#reader').classList.remove('open'); });
 
-  return { show: ensure, _test:{ parseStandings, parseMatches, extractArticle, loadTff, loadNews } };
+  return { show: ensure, altSekme: () => ALT[view], _test:{ parseStandings, parseMatches, extractArticle, loadTff, loadNews } };
 })();

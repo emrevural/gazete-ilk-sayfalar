@@ -194,7 +194,16 @@ const KAYNAKLAR = [
 /* ============================================= */
 
 const $ = s => document.querySelector(s);
-const state = { tab: window.BULUT ? 'kesan' : KAYNAKLAR[0].id, data: {}, list: [], index: 0 };
+// Açık sekme adres çubuğunda tutulur (#edirne, #ulusal, #kesanspor-lig …): yenileyince aynı yerde kalır
+const HASH = { edirne:'edirne', yaygin:'ulusal', kesan:'kesanspor' };
+function hashSekme(){
+  const h = decodeURIComponent(location.hash.slice(1)).toLowerCase().split('-')[0];
+  return Object.keys(HASH).find(k => HASH[k] === h) || null;
+}
+function hashYaz(sekme, alt){
+  try{ history.replaceState(history.state, '', '#' + HASH[sekme] + (alt ? '-' + alt : '')); }catch{}
+}
+const state = { tab: hashSekme() || (window.BULUT ? 'kesan' : KAYNAKLAR[0].id), data: {}, list: [], index: 0 };
 
 $('#date').textContent = new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -203,7 +212,7 @@ KAYNAKLAR.forEach(k=>{
   const b = document.createElement('button');
   b.className = 'tab' + (k.id===state.tab?' active':'');
   b.textContent = k.ad; b.dataset.id = k.id;
-  b.onclick = () => { state.tab = k.id; document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.id===k.id)); $('#search').value=''; load(); };
+  b.onclick = () => { state.tab = k.id; hashYaz(k.id, k.ozel ? Kesan.altSekme() : ''); document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.id===k.id)); $('#search').value=''; load(); };
   $('#tabs').appendChild(b);
 });
 $('#refresh').onclick = () => load(true);
